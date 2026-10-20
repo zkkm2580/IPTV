@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000"
+    android:keepScreenOn="true">
+
+    <!-- 全屏视频播放容器 (Media3 PlayerView) -->
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/player_view"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:use_controller="false"
+        app:surface_type="surface_view"
+        app:resize_mode="fit"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- 顶部状态栏（当前时间、换台提示） -->
+    <LinearLayout
+        android:id="@+id/layout_top_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="20dp"
+        android:gravity="end|center_vertical"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TextView
+            android:id="@+id/tv_clock"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#CCFFFFFF"
+            android:textSize="16sp"
+            android:fontFamily="monospace"
+            android:text="00:00" />
+    </LinearLayout>
+
+    <!-- 底部 OSD 换台信息栏 -->
+    <LinearLayout
+        android:id="@+id/layout_osd"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="32dp"
+        android:layout_marginStart="32dp"
+        android:background="@drawable/bg_osd_bar"
+        android:orientation="horizontal"
+        android:paddingHorizontal="24dp"
+        android:paddingVertical="14dp"
+        android:gravity="center_vertical"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <TextView
+            android:id="@+id/tv_osd_number"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#38BDF8"
+            android:textSize="26sp"
+            android:fontFamily="monospace"
+            android:textStyle="bold"
+            android:text="01" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_osd_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:text="CCTV-1 综合" />
+
+            <TextView
+                android:id="@+id/tv_osd_group"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="#9CA3AF"
+                android:textSize="13sp"
+                android:text="央视频道 · 1080P" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- 缓冲与连接状态提示 -->
+    <LinearLayout
+        android:id="@+id/layout_buffering"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <ProgressBar
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:indeterminateTint="#38BDF8" />
+
+        <TextView
+            android:id="@+id/tv_buffer_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textColor="#E5E7EB"
+            android:textSize="15sp"
+            android:text="正在连接直播流..." />
+    </LinearLayout>
+
+    <!-- 左侧频道抽屉选台菜单 (遥控器按 OK 呼出，左右切换分类，上下选择频道) -->
+    <LinearLayout
+        android:id="@+id/layout_channel_drawer"
+        android:layout_width="400dp"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_drawer"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <!-- 左侧分类列表 -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_groups"
+            android:layout_width="130dp"
+            android:layout_height="match_parent"
+            android:background="#33000000" />
+
+        <!-- 右侧频道列表 -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rv_channels"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" />
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

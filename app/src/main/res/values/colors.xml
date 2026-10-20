@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#1E88E5</color>
+    <color name="primary_dark">#0D47A1</color>
+    <color name="accent">#FF4081</color>
+
+    <color name="black_overlay">#CC000000</color>
+    <color name="drawer_bg">#DD111827</color>
+    <color name="text_main">#FFFFFF</color>
+    <color name="text_sub">#9CA3AF</color>
+    <color name="item_focus">#2563EB</color>
+    <color name="item_focus_text">#FFFFFF</color>
+</resources>

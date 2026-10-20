@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tv_group_name"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center"
+    android:paddingVertical="14dp"
+    android:paddingHorizontal="16dp"
+    android:textColor="@color/text_sub"
+    android:textSize="16sp"
+    android:textStyle="bold"
+    android:focusable="true"
+    android:clickable="true" />
