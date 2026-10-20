@@ -11,9 +11,14 @@ android {
         applicationId = "io.nbhg.iptv"
         minSdk = 21
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        ndk {
+            // 包含 armeabi-v7a 与 arm64-v8a 核心电视芯片与车载架构
+            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
+        }
     }
 
     buildTypes {
@@ -43,10 +48,6 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
 
-    // Media3 (ExoPlayer) 核心流媒体引擎
-    implementation("androidx.media3:media3-exoplayer:1.2.1")
-    implementation("androidx.media3:media3-exoplayer-hls:1.2.1")
-    implementation("androidx.media3:media3-exoplayer-rtsp:1.2.1")
-    implementation("androidx.media3:media3-ui:1.2.1")
-    implementation("androidx.media3:media3-session:1.2.1")
+    // VideoLAN LibVLC 官方底层核心引擎 (包含 libvlc.so 及完整解封装硬解码支持)
+    implementation("org.videolan.android:libvlc-all:3.6.5")
 }

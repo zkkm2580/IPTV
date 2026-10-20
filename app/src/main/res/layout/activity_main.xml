@@ -6,20 +6,17 @@
     android:background="#000000"
     android:keepScreenOn="true">
 
-    <!-- 全屏视频播放容器 (Media3 PlayerView) -->
-    <androidx.media3.ui.PlayerView
-        android:id="@+id/player_view"
+    <!-- VideoLAN LibVLC 核心视频渲染层 -->
+    <org.videolan.libvlc.util.VLCVideoLayout
+        android:id="@+id/vlc_video_layout"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        app:use_controller="false"
-        app:surface_type="surface_view"
-        app:resize_mode="fit"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- 顶部状态栏（当前时间、换台提示） -->
+    <!-- 顶部状态栏（时钟、画幅比例与设置入口） -->
     <LinearLayout
         android:id="@+id/layout_top_bar"
         android:layout_width="match_parent"
@@ -29,16 +26,40 @@
         app:layout_constraintTop_toTopOf="parent">
 
         <TextView
+            android:id="@+id/tv_aspect_ratio"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp"
+            android:background="@drawable/bg_osd_bar"
+            android:textColor="#38BDF8"
+            android:textSize="13sp"
+            android:text="16:9" />
+
+        <TextView
+            android:id="@+id/tv_btn_settings"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp"
+            android:background="@drawable/bg_osd_bar"
+            android:textColor="#E5E7EB"
+            android:textSize="13sp"
+            android:text="设置" />
+
+        <TextView
             android:id="@+id/tv_clock"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
             android:textColor="#CCFFFFFF"
             android:textSize="16sp"
             android:fontFamily="monospace"
             android:text="00:00" />
     </LinearLayout>
 
-    <!-- 底部 OSD 换台信息栏 -->
+    <!-- 底部沉浸式 OSD 换台与 EPG 节目信息栏 -->
     <LinearLayout
         android:id="@+id/layout_osd"
         android:layout_width="wrap_content"
@@ -58,7 +79,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:textColor="#38BDF8"
-            android:textSize="26sp"
+            android:textSize="28sp"
             android:fontFamily="monospace"
             android:textStyle="bold"
             android:text="01" />
@@ -76,7 +97,16 @@
                 android:textColor="#FFFFFF"
                 android:textSize="20sp"
                 android:textStyle="bold"
-                android:text="CCTV-1 综合" />
+                android:text="频道名称" />
+
+            <TextView
+                android:id="@+id/tv_osd_epg"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:textColor="#38BDF8"
+                android:textSize="14sp"
+                android:text="EPG 节目单获取中..." />
 
             <TextView
                 android:id="@+id/tv_osd_group"
@@ -84,8 +114,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:textColor="#9CA3AF"
-                android:textSize="13sp"
-                android:text="央视频道 · 1080P" />
+                android:textSize="12sp"
+                android:text="未分类 · LibVLC 硬解" />
         </LinearLayout>
     </LinearLayout>
 
@@ -114,13 +144,53 @@
             android:layout_marginTop="12dp"
             android:textColor="#E5E7EB"
             android:textSize="15sp"
-            android:text="正在连接直播流..." />
+            android:text="LibVLC 正在解封装直播流..." />
     </LinearLayout>
 
-    <!-- 左侧频道抽屉选台菜单 (遥控器按 OK 呼出，左右切换分类，上下选择频道) -->
+    <!-- 无内置频道时的初始引导与配置提示 -->
+    <LinearLayout
+        android:id="@+id/layout_empty_state"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_osd_bar"
+        android:orientation="vertical"
+        android:padding="28dp"
+        android:gravity="center"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📺 暂无播放源"
+            android:textColor="#FFFFFF"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="已取消硬编码内置频道，请点击下方配置您的 M3U/M3U8 直播源"
+            android:textColor="#9CA3AF"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/btn_config_source"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:backgroundTint="#2563EB"
+            android:text="配置 M3U 播放源与代理" />
+    </LinearLayout>
+
+    <!-- 左侧频道与分类双层抽屉选台菜单 (遥控器按 OK 呼出) -->
     <LinearLayout
         android:id="@+id/layout_channel_drawer"
-        android:layout_width="400dp"
+        android:layout_width="420dp"
         android:layout_height="match_parent"
         android:background="@drawable/bg_drawer"
         android:orientation="horizontal"
@@ -132,7 +202,7 @@
         <!-- 左侧分类列表 -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rv_groups"
-            android:layout_width="130dp"
+            android:layout_width="140dp"
             android:layout_height="match_parent"
             android:background="#33000000" />
 

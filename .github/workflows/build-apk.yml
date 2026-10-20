@@ -33,41 +33,42 @@ jobs:
     - name: 整理发布 APK 文件
       id: release_apk
       run: |
-        TAG_NAME="v1.0.0-$(date +'%Y%m%d%H%M')"
+        TAG_NAME="v1.1.0-$(date +'%Y%m%d%H%M')"
         echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
         mkdir -p release_dist
-        cp app/build/outputs/apk/debug/*.apk "release_dist/IPTV直播电视.apk"
+        cp app/build/outputs/apk/debug/*.apk "release_dist/IPTV直播电视-LibVLC.apk"
         cp app/build/outputs/apk/debug/*.apk "release_dist/IPTV-Latest.apk"
 
     - name: 上传 APK 安装包至 Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: IPTV-Debug-APK
-        path: release_dist/IPTV直播电视.apk
+        path: release_dist/IPTV直播电视-LibVLC.apk
         retention-days: 7
 
     - name: 发布 APK 到 GitHub Releases
       uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ steps.release_apk.outputs.tag_name }}
-        name: IPTV直播电视 v1.0.0 (${{ steps.release_apk.outputs.tag_name }})
+        name: IPTV直播电视 LibVLC 版 v1.1.0 (${{ steps.release_apk.outputs.tag_name }})
         body: |
-          ### IPTV 直播电视播放器发布说明
+          ### IPTV 直播电视播放器 (LibVLC 核心版)
           
-          - 📺 **高性能现代流媒体播放引擎**：
-            - 基于 AndroidX Media3 (ExoPlayer) 核心框架构建，启动秒开；
-            - 深度支持 HLS (`.m3u8`)、HTTP-TS、RTMP/RTSP 等多种广电级直播流协议；
-            - 支持智能错误自愈与流断线自动重连。
+          - 🚀 **全新 VideoLAN LibVLC 原生播放核心**：
+            - 集成完整 LibVLC 底层动态链接库（支持 `libvlc.so` 全套解码器）；
+            - 全格式解封装支持：原生兼容广播级 MPEG-TS 流、UDP/RTP 组播广播、HLS (`.m3u8`) 以及 RTMP/RTSP；
+            - 开启 MediaCodec 硬解加速，完美支持 AC3、E-AC3、MP2、DTS 等广电音频格式；
+            - 支持画幅自适应缩放（16:9、4:3、全屏拉伸、自适应）与网络断流自动重连。
           
-          - 📑 **全格式 M3U / M3U8 列表解析**：
-            - 支持解析标准 `#EXTM3U`、`#EXTINF` 扩展标签（台标、分组、EPG ID）；
-            - 内置央视频道、省市卫视等高清直播源预设，支持网络列表在线更新。
+          - 📑 **取消内置频道，纯 M3U 数据源驱动**：
+            - 移除写死频道，支持用户自定义在线 M3U 订阅 URL、本地导入与动态持久化；
+            - 逐行提取 `#EXTM3U` 中的 `#EXTINF` 元数据，按 `group-title` 自动分类（央视、卫视、地方台等）。
           
-          - 🎮 **电视盒子遥控器与车载触屏双重适配**：
-            - 针对电视遥控器方向键（上下换台、左右换组、OK 呼出选台栏）；
-            - 触屏手势切换频道与沉浸式全屏 OSD 节目状态显示。
+          - 🌐 **光猫专网组播 udpxy 代理与 EPG 节目单**：
+            - 内置 udpxy 代理转换：可将电信/联通光猫内网 `rtp://` 或 `udp://` 智能转为 HTTP 流；
+            - 内置 `TvgProvider` 异步下载并流式解析 XMLTV (`.xml` / `.xml.gz`) 电子节目单，实时展示正在播出的节目与播放进度。
         files: |
-          release_dist/IPTV直播电视.apk
+          release_dist/IPTV直播电视-LibVLC.apk
           release_dist/IPTV-Latest.apk
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

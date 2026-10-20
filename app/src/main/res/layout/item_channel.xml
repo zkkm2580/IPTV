@@ -5,28 +5,47 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:paddingVertical="12dp"
+    android:paddingVertical="10dp"
     android:paddingHorizontal="16dp"
     android:focusable="true"
     android:clickable="true">
 
     <TextView
         android:id="@+id/tv_channel_number"
-        android:layout_width="40dp"
+        android:layout_width="36dp"
         android:layout_height="wrap_content"
         android:textColor="@color/text_sub"
         android:textSize="14sp"
         android:fontFamily="monospace"
         android:text="01" />
 
-    <TextView
-        android:id="@+id/tv_channel_name"
+    <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:textColor="@color/text_main"
-        android:textSize="16sp"
-        android:text="CCTV-1 综合" />
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tv_channel_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_main"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:singleLine="true"
+            android:text="频道名称" />
+
+        <!-- 实时 EPG 当前节目与播出进度 -->
+        <TextView
+            android:id="@+id/tv_channel_epg"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="@color/text_sub"
+            android:textSize="12sp"
+            android:singleLine="true"
+            android:text="暂无节目单" />
+    </LinearLayout>
 
     <TextView
         android:id="@+id/tv_channel_badge"
@@ -34,5 +53,5 @@
         android:layout_height="wrap_content"
         android:textColor="#38BDF8"
         android:textSize="11sp"
-        android:text="HD" />
+        android:text="LIVE" />
 </LinearLayout>
