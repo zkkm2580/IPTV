@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
@@ -29,12 +30,12 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * IPTV 核心播放界面
- * - 播放引擎：基于 VideoLAN 官方 LibVLC 原生底层（libvlc.so + MediaCodec 硬解），支持 TS/HLS/UDP/RTP 组播/RTMP/RTSP 全格式解封装与 AC3/E-AC3/MP2 解码；
- * - 组播代理：集成 udpxy 转换；
- * - 节目单：集成 TvgProvider 实时展示当前正在播放节目与进度；
- * - 画面比例：支持 16:9 / 4:3 / 全屏拉伸 / 原始比例切换；
- * - 播放源：无内置写死频道，纯 M3U 驱动。
+ * IPTV 核心播放界面 (LibVLC 核心引擎 + Tvheadend / MPEG-TS 深度适配)
+ * - 核心机制：基于 VideoLAN 官方底层 LibVLC (libvlc.so + libvlcjni.so)；
+ * - 针对 Tvheadend 特征流（:8168/:9981/stream/profile=pass/audio/mp2t）定制 TS 解封装器与 VLC 原生 User-Agent；
+ * - 软硬解双重自愈容灾：当车机或盒子 MediaCodec 硬解对 MPEG-2/MP2 音频报错时，毫秒级自动回退至 LibVLC 软解；
+ * - 组播代理：内置 udpxy 转换；
+ * - 画面比例：16:9 / 4:3 / 全屏拉伸 / 自适应。
  */
 class MainActivity : AppCompatActivity() {
 
@@ -69,12 +70,20 @@ class MainActivity : AppCompatActivity() {
     private var currentChannelIndex = 0
     private var currentChannel: IptvChannel? = null
 
+    // 容灾重试状态：记录当前频道是否已尝试过降级软解
+    private var hasTriedSoftwareFallback = false
+
     // 画幅比例模式（16:9、4:3、全屏拉伸、自适应）
     private val aspectRatios = arrayOf("16:9", "4:3", "拉伸", "自适应")
     private var currentAspectIndex = 0
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val clockFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
+
+    companion object {
+        private const val TAG = "IptvPlayer"
+        const val VLC_USER_AGENT = "VLC/3.0.18 (Linux; Android)"
+    }
 
     private val hideOsdRunnable = Runnable {
         layoutOsd.animate().alpha(0f).setDuration(300).withEndAction {
@@ -146,24 +155,28 @@ class MainActivity : AppCompatActivity() {
         channelAdapter = ChannelAdapter(emptyList()) { channel, _ ->
             currentChannel = channel
             currentChannelIndex = allChannels.indexOf(channel).coerceAtLeast(0)
-            playChannel(channel)
+            hasTriedSoftwareFallback = false
+            playChannel(channel, useSoftwareDecoder = false)
             hideChannelDrawer()
         }
         rvChannels.adapter = channelAdapter
     }
 
     /**
-     * 初始化 VideoLAN LibVLC 原生播放引擎与硬解参数
+     * 初始化 VideoLAN LibVLC 原生播放引擎
+     * 全面支持 Tvheadend MPEG-TS 流与 HLS 协议，移除破坏 TS 时钟同步的 clock-jitter=0 选项
      */
     private fun initLibVlc() {
         val options = arrayListOf(
-            "--file-caching=2000",
-            "--network-caching=3000",
+            "--http-user-agent=$VLC_USER_AGENT",
+            "--network-caching=2500",
             "--live-caching=2000",
+            "--file-caching=2000",
             "--sout-mux-caching=2000",
-            "--codec=mediacodec_ndk,mediacodec_jni,all", // 开启 MediaCodec 硬件加速
-            "--drop-late-frames",
-            "--skip-frames",
+            "--codec=mediacodec_ndk,mediacodec_jni,all", // 优先硬件加速，失败自动降级
+            "--http-reconnect",
+            "--ts-trust-pcr",
+            "--no-sub-autodetect-file",
             "-vvv"
         )
         libVLC = LibVLC(this, options)
@@ -182,16 +195,93 @@ class MainActivity : AppCompatActivity() {
                     layoutBuffering.visibility = View.GONE
                 }
                 MediaPlayer.Event.EncounteredError -> {
-                    layoutBuffering.visibility = View.VISIBLE
-                    tvBufferStatus.text = "直播流中断，LibVLC 正在自动重连..."
-                    mainHandler.postDelayed({
-                        currentChannel?.let { playChannel(it) }
-                    }, 2500L)
+                    Log.w(TAG, "LibVLC 播放异常")
+                    handlePlaybackError()
                 }
                 MediaPlayer.Event.EndReached -> {
-                    currentChannel?.let { playChannel(it) }
+                    // Tvheadend 或 HLS 断开时自动重连
+                    currentChannel?.let { playChannel(it, useSoftwareDecoder = false) }
                 }
             }
+        }
+    }
+
+    /**
+     * 判断是否为 Tvheadend 特征流或 MPEG-TS 传输流
+     */
+    private fun isTvheadendOrTs(url: String): Boolean {
+        return url.contains(":8168", ignoreCase = true) ||
+                url.contains(":9981", ignoreCase = true) ||
+                url.contains("/stream/", ignoreCase = true) ||
+                url.contains("profile=pass", ignoreCase = true) ||
+                url.endsWith(".ts", ignoreCase = true) ||
+                url.contains(".ts?", ignoreCase = true) ||
+                url.startsWith("rtp://", ignoreCase = true) ||
+                url.startsWith("udp://", ignoreCase = true)
+    }
+
+    private fun playChannel(channel: IptvChannel, useSoftwareDecoder: Boolean = false) {
+        currentChannel = channel
+        showOsd(channel)
+
+        val vlc = libVLC ?: return
+        val player = mediaPlayer ?: return
+
+        // 组播代理转换（rtp/udp 经由 udpxy 转为 http）
+        val convertedUrl = UdpxyHelper.convertUrl(this, channel.streamUrl)
+        val isTvheadend = isTvheadendOrTs(convertedUrl)
+
+        layoutBuffering.visibility = View.VISIBLE
+        val modeDesc = if (useSoftwareDecoder) "LibVLC软解" else "LibVLC硬解"
+        tvBufferStatus.text = if (isTvheadend) "正在连接 Tvheadend 流 ($modeDesc)..." else "正在连接 ${channel.name}..."
+
+        try {
+            player.stop()
+            val media = Media(vlc, Uri.parse(convertedUrl)).apply {
+                // 软硬解选择：若开启硬解失败，则 fallback 到 LibVLC 内置软解
+                setHWDecoderEnabled(!useSoftwareDecoder, false)
+
+                // 注入 VLC 标准 UA，防止 Tvheadend 服务端拒绝非 VLC 客户端访问
+                addOption(":http-user-agent=$VLC_USER_AGENT")
+                addOption(":network-caching=2500")
+                addOption(":http-reconnect=true")
+
+                // 针对 Tvheadend 及 MPEG-TS 流显式指定 TS 解封装器与时钟对齐
+                if (isTvheadend) {
+                    addOption(":demux=ts")
+                    addOption(":ts-extra-pmt=1")
+                    addOption(":ts-trust-pcr")
+                }
+            }
+            player.media = media
+            media.release()
+            player.play()
+        } catch (e: Exception) {
+            Log.e(TAG, "playChannel 发生异常: ${e.message}")
+            handlePlaybackError()
+        }
+    }
+
+    /**
+     * 自动容灾：硬解失败时自动降级软解，避免某些芯片对 Tvheadend MP2 音频或特定 MPEG-2 报错黑屏
+     */
+    private fun handlePlaybackError() {
+        val channel = currentChannel ?: return
+        if (!hasTriedSoftwareFallback) {
+            hasTriedSoftwareFallback = true
+            Log.d(TAG, "检测到播放失败，尝试自动切换至 LibVLC 原生软解模式...")
+            mainHandler.post {
+                layoutBuffering.visibility = View.VISIBLE
+                tvBufferStatus.text = "硬解兼容受限，正在自动切换软解..."
+                playChannel(channel, useSoftwareDecoder = true)
+            }
+        } else {
+            layoutBuffering.visibility = View.VISIBLE
+            tvBufferStatus.text = "直播源断开，3 秒后自动重试..."
+            mainHandler.postDelayed({
+                hasTriedSoftwareFallback = false
+                playChannel(channel, useSoftwareDecoder = false)
+            }, 3000L)
         }
     }
 
@@ -211,7 +301,8 @@ class MainActivity : AppCompatActivity() {
                     layoutEmptyState.visibility = View.GONE
                     allChannels = channels
                     applyChannels(channels)
-                    playChannel(channels[0])
+                    hasTriedSoftwareFallback = false
+                    playChannel(channels[0], useSoftwareDecoder = false)
                 } else {
                     layoutEmptyState.visibility = View.VISIBLE
                 }
@@ -232,40 +323,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun playChannel(channel: IptvChannel) {
-        currentChannel = channel
-        showOsd(channel)
-
-        val vlc = libVLC ?: return
-        val player = mediaPlayer ?: return
-
-        // 经过 udpxy 组播代理（若为 rtp:// 或 udp:// 且配置了代理则自动转换）
-        val convertedUrl = UdpxyHelper.convertUrl(this, channel.streamUrl)
-
-        layoutBuffering.visibility = View.VISIBLE
-        tvBufferStatus.text = "LibVLC 正在连接 ${channel.name}..."
-
-        try {
-            player.stop()
-            val media = Media(vlc, Uri.parse(convertedUrl)).apply {
-                setHWDecoderEnabled(true, false)
-                addOption(":network-caching=3000")
-                addOption(":clock-jitter=0")
-                addOption(":clock-synchro=0")
-            }
-            player.media = media
-            media.release()
-            player.play()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
     private fun showOsd(channel: IptvChannel) {
         val index = allChannels.indexOf(channel)
         tvOsdNumber.text = String.format("%02d", if (index >= 0) index + 1 else 1)
         tvOsdName.text = channel.name
-        tvOsdGroup.text = "${channel.group} · LibVLC"
+        val streamTag = if (isTvheadendOrTs(channel.streamUrl)) "Tvheadend TS" else "LibVLC"
+        tvOsdGroup.text = "${channel.group} · $streamTag"
         updateOsdEpg(channel)
 
         layoutOsd.alpha = 1f
@@ -335,13 +398,15 @@ class MainActivity : AppCompatActivity() {
     private fun nextChannel() {
         if (allChannels.isEmpty()) return
         currentChannelIndex = (currentChannelIndex + 1) % allChannels.size
-        playChannel(allChannels[currentChannelIndex])
+        hasTriedSoftwareFallback = false
+        playChannel(allChannels[currentChannelIndex], useSoftwareDecoder = false)
     }
 
     private fun prevChannel() {
         if (allChannels.isEmpty()) return
         currentChannelIndex = if (currentChannelIndex - 1 < 0) allChannels.size - 1 else currentChannelIndex - 1
-        playChannel(allChannels[currentChannelIndex])
+        hasTriedSoftwareFallback = false
+        playChannel(allChannels[currentChannelIndex], useSoftwareDecoder = false)
     }
 
     /**
